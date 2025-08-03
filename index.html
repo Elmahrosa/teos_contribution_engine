@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TEOS Contribution Engine</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+    <script src="https://unpkg.com/@solana/web3.js@1.28.0/dist/web3.min.js"></script>
+    <script src="https://unpkg.com/@solana/wallet-adapter-react@0.9.0/dist/index.umd.js"></script>
+    <script src="https://unpkg.com/phantom-wallet-adapter@0.9.0/dist/index.umd.js"></script>
+</head>
+<body class="bg-background text-text font-sans">
+    <div class="container mx-auto p-6">
+        <header class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold">TEOS Contribution Engine</h1>
+            <button id="connectWallet" class="bg-primary text-white px-4 py-2 rounded">Connect Wallet</button>
+        </header>
+
+        <section class="mb-6">
+            <h2 class="text-2xl font-semibold mb-4">Make a Contribution</h2>
+            <div class="flex flex-col md:flex-row md:items-center">
+                <input type="number" id="contributionAmount" placeholder="Enter amount (SOL)" class="border border-gray-300 rounded p-2 mb-4 md:mb-0 md:mr-4" />
+                <button id="contributeButton" class="bg-secondary text-white px-4 py-2 rounded">Contribute</button>
+                <span id="loadingIndicator" class="ml-4 hidden">Processing...</span>
+            </div>
+            <div id="errorMessage" class="text-red-500 mt-2 hidden"></div>
+        </section>
+
+        <section class="mb-6">
+            <h2 class="text-2xl font-semibold mb-4">Contribution Statistics</h2>
+            <div id="stats" class="bg-white shadow-md rounded p-4">
+                <p>Total Contributions: <span id="totalContributions">0</span> SOL</p>
+                <p>Number of Contributors: <span id="numberOfContributors">0</span></p>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="text-2xl font-semibold mb-4">Recent Contributions</h2>
+            <ul id="recentContributions" class="bg-white shadow-md rounded p-4 space-y-2">
+                <!-- Recent contributions will be populated here -->
+            </ul>
+        </section>
+    </div>
+
+    <script>
+        const connectWalletButton = document.getElementById('connectWallet');
+        const contributeButton = document.getElementById('contributeButton');
+        const contributionAmountInput = document.getElementById('contributionAmount');
+        const totalContributionsElement = document.getElementById('totalContributions');
+        const numberOfContributorsElement = document.getElementById('numberOfContributors');
+        const recentContributionsElement = document.getElementById('recentContributions');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const errorMessage = document.getElementById('errorMessage');
+
+        let provider;
+
+        connectWalletButton.addEventListener('click', async () => {
+            if (window.solana) {
+                provider = window.solana;
+                try {
+                    const response = await provider.connect();
+                    console.log('Connected to wallet:', response.publicKey.toString());
+                    fetchContributionData(); // Fetch initial data after connecting
+                } catch (err) {
+                    console.error('Connection failed:', err);
+                    alert('Failed to connect wallet. Please try again.');
+                }
+            } else {
+                alert('Please install a Solana wallet like Phantom.');
+            }
+        });
+
+        contributeButton.addEventListener('click', async () => {
+            const amount = parseFloat(contributionAmountInput.value);
+            if (isNaN(amount) || amount <= 0) {
+                showError('Please enter a valid contribution amount.');
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+
+            try {
+                // Call your smart contract to make a contribution
+                const response = await axios.post(`${process.env.REACT_APP_API_URL}/contribute`, {
+                    amount,
+                    walletAddress: provider.publicKey.toString(),
+                });
+
+                // Update UI with new statistics
+                totalContributionsElement.textContent = response.data.totalContributions;
+                numberOfContributorsElement.textContent = response.data.numberOfContributors;
+
+                // Add recent contribution to the list
+                const listItem = document.createElement('li');
+                listItem.textContent = `Wallet: ${provider.publicKey.toString()} contributed ${amount} SOL`;
+                recentContributionsElement.appendChild(listItem);
+
+                // Clear input
+                contributionAmountInput.value = '';
+            } catch (error) {
+                console.error('Contribution failed:', error);
+                showError('Contribution failed. Please try again.');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        async function fetchContributionData() {
+            try {
+                const response = await axios.get(`${process.env.REACT_APP_API_URL}/stats`);
+                totalContributionsElement.textContent = response.data.totalContributions;
+                numberOfContributorsElement.textContent = response.data.numberOfContributors;
+
+                // Fetch recent contributions
+                const recentContributions = response.data.recentContributions;
+                recentContributionsElement.innerHTML = ''; // Clear existing contributions
+                recentContributions.forEach(contribution => {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = `Wallet: ${contribution.walletAddress} contributed ${contribution.amount} SOL`;
+                    recentContributionsElement.appendChild(listItem);
+                });
+            } catch (error) {
+                console.error('Failed to fetch contribution data:', error);
+            }
+        }
+    </script>
+</body>
+</html>
