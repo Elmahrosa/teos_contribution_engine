@@ -1,4 +1,4 @@
-# teos_contribution_engine
+# TEOS NETWORK ELMAHROSA
 Civic-first engine powering referrals, contributions, and NFT rewards for Egypt’s digital pioneers
 # TEOS Contribution Engine
 
